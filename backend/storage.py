@@ -9,16 +9,31 @@ else in the app needs to change, since routes only ever call these functions.
 """
 import json
 import os
+import shutil
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DATA_DIR = os.getenv("DATA_DIR") or ("/tmp/data" if os.getenv("VERCEL") else os.path.join(os.path.dirname(__file__), "data"))
 DOCS_DIR = os.path.join(DATA_DIR, "documents")
 FILES_DIR = os.path.join(DATA_DIR, "uploads")
 
 os.makedirs(DOCS_DIR, exist_ok=True)
 os.makedirs(FILES_DIR, exist_ok=True)
+
+# If running on Vercel (/tmp/data), seed existing sample data from bundled repository data
+bundled_data = os.path.join(os.path.dirname(__file__), "data")
+if DATA_DIR != bundled_data and os.path.exists(bundled_data):
+    for sub in ["documents", "uploads"]:
+        src_sub = os.path.join(bundled_data, sub)
+        dst_sub = os.path.join(DATA_DIR, sub)
+        if os.path.exists(src_sub):
+            for item in os.listdir(src_sub):
+                src_file = os.path.join(src_sub, item)
+                dst_file = os.path.join(dst_sub, item)
+                if os.path.isfile(src_file) and not os.path.exists(dst_file):
+                    shutil.copy2(src_file, dst_file)
+
 
 
 def _doc_path(doc_id: str) -> str:

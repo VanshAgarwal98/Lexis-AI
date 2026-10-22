@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 async function handle(res) {
   if (!res.ok) {
@@ -18,7 +18,7 @@ async function safeFetch(url, options = {}) {
     return await handle(res);
   } catch (err) {
     if (err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
-      throw new Error(`Unable to reach backend server at ${BASE_URL}. Please ensure the backend is running.`);
+      throw new Error(`Unable to reach backend server. Please ensure the backend is running.`);
     }
     throw err;
   }

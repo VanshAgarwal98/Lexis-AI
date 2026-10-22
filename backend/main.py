@@ -5,7 +5,7 @@ Run with: uvicorn main:app --reload --port 8000
 import difflib
 import os
 import re
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -22,6 +22,7 @@ from services.gemini_service import (
 from services.report import build_report_pdf, build_comparison_report_pdf
 
 app = FastAPI(title="Legal Contract Analyzer API")
+router = APIRouter()
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +33,7 @@ app.add_middleware(
 )
 
 
-@app.get("/health")
+@router.get("/health")
 def health():
     return {
         "status": "ok",
@@ -41,7 +42,7 @@ def health():
     }
 
 
-@app.post("/documents/upload")
+@router.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...), doc_type: str = Form("Other")):
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="No valid file uploaded.")
@@ -66,12 +67,12 @@ async def upload_document(file: UploadFile = File(...), doc_type: str = Form("Ot
     return {"id": record["id"], "filename": record["filename"], "doc_type": record["doc_type"]}
 
 
-@app.get("/documents")
+@router.get("/documents")
 def list_documents():
     return storage.list_documents()
 
 
-@app.get("/documents/{doc_id}")
+@router.get("/documents/{doc_id}")
 def get_document(doc_id: str):
     doc = storage.get_document(doc_id)
     if doc is None:
@@ -79,7 +80,7 @@ def get_document(doc_id: str):
     return doc
 
 
-@app.delete("/documents/{doc_id}")
+@router.delete("/documents/{doc_id}")
 def delete_document(doc_id: str):
     ok = storage.delete_document(doc_id)
     if not ok:
@@ -87,7 +88,7 @@ def delete_document(doc_id: str):
     return {"deleted": True}
 
 
-@app.post("/documents/{doc_id}/analyze")
+@router.post("/documents/{doc_id}/analyze")
 def analyze_document(doc_id: str):
     doc = storage.get_document(doc_id)
     if doc is None:
@@ -115,7 +116,7 @@ class ChatRequest(BaseModel):
     question: str
 
 
-@app.post("/documents/{doc_id}/chat")
+@router.post("/documents/{doc_id}/chat")
 def chat_with_document(doc_id: str, req: ChatRequest):
     doc = storage.get_document(doc_id)
     if doc is None:
@@ -136,7 +137,7 @@ class CompareRequest(BaseModel):
     doc_id_b: str
 
 
-@app.post("/documents/compare")
+@router.post("/documents/compare")
 def compare_documents(req: CompareRequest):
     doc_a = storage.get_document(req.doc_id_a)
     doc_b = storage.get_document(req.doc_id_b)
@@ -171,7 +172,7 @@ def compare_documents(req: CompareRequest):
     }
 
 
-@app.get("/documents/{doc_id}/report")
+@router.get("/documents/{doc_id}/report")
 def get_report(doc_id: str):
     doc = storage.get_document(doc_id)
     if doc is None:
@@ -190,7 +191,7 @@ def get_report(doc_id: str):
     )
 
 
-@app.post("/documents/compare/report")
+@router.post("/documents/compare/report")
 def get_comparison_report(req: CompareRequest):
     doc_a = storage.get_document(req.doc_id_a)
     doc_b = storage.get_document(req.doc_id_b)
@@ -204,3 +205,9 @@ def get_comparison_report(req: CompareRequest):
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="comparison_report.pdf"'},
     )
+
+
+# Include router under /api for Vercel service rewrites & local proxy, and at root / for direct calls
+app.include_router(router, prefix="/api")
+app.include_router(router)
+
